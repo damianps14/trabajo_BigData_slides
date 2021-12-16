@@ -1,1 +1,0 @@
-# trabajo_Bigdata_slides
