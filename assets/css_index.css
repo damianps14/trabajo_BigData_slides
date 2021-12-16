@@ -1,0 +1,103 @@
+/*  ----------------- fichero CSS para tunear nuestro html  -------------- */ 
+
+
+
+/* defino algunos colores para usarlos en el texto*/ 
+.rojito { color: #FF0504; }
+.verdecito { color: #10FF08; }
+.purple { color: #c077af; }
+.turquesa { color: #2BD681; }
+.beige { color: #F4EE92; }
+
+/* defino algunos tamaños para usarlos en el texto*/ 
+.large { font-size: 140%; }
+.small { font-size: 80%; }
+
+/* definiendo estilos del titulo del documento */ 
+.title {
+  font-size: 44px;
+  color: black;
+  font-weight: bold;
+  text-align: center; }
+
+/* definiendo estilos del titulo del author (he puesto la UV) */ 
+.author {
+  font-size: 25px;
+  color: black; }
+
+
+/* definiendo estilos de los títulos de primer nivel (h1) */ 
+h1 {
+  font-size: 35px;
+  margin-top: 45px;       /* dejar algo de espacio (45 pixeles) antes de un título de primer nivel*/ 
+  margin-bottom: 35px; }  /* dejar algo de espacio despúes de un título de primer nivel*/ 
+
+
+/* definiendo estilos de los títulos de h2 a h5 nivel */ 
+h2, h3, h4, h5 {
+  letter-spacing: 0.04em;  /* espaciado enre las letras (0.04 de la altura de la tipografía) */
+  margin-left: 15px; }  /* dejar espacio a la izquierda*/ 
+
+
+
+/* definiendo estilos del body : de toda la página */ 
+body { 
+  background-color: beige; }  /* color del fondo*/ 
+
+
+/* importo un tipo de letra */ 
+@import url(http://fonts.googleapis.com/css?family=Open+Sans:300italic,300); 
+
+/* definiendo estilos de los párrafos */ 
+p {
+  text-align: justify;         /* justificar el texto del body */      
+  line-height: 1.4;            /* anchura entre las lineas 1.0 is the default in Firefox. 2.0 provides a large space */     
+  margin: 10px 0px 10px 0px;    /* margenes entre los párafos: top, izquierda, abajo, left */   
+  font-size: 13pt;                                     /* tamaño de letra */   
+  font-family: 'Open Sans', Helvetica, sans-serif; }   /* tipo de letra, previamente la he importado */  
+
+
+
+/* definiendo estilos de las cajas de código (chunks) */ 
+pre {
+  background-color: lightgreen;  /* color de las cajas de código */ 
+	font-size: 10pt;
+ 	border-radius: 9px;     /* q los bordes de las cajas sean redondas */ 
+	font-family: Monaco, monospace;
+  
+}
+
+/* cambiar el color de los hipervinculos/enlaces  */
+a {
+  font-weight: bold; }
+
+
+/* cambiar el aspecto del TOC: 
+https://stackoverflow.com/questions/42546001/how-to-change-colors-and-attributes-of-table-of-contents-in-r-markdown-html-docu */
+.list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover{
+  color: white;
+  font-weight: bold;
+  background-color: #B38209; }
+   
+   
+/* para hacer cajas de texto de colorines*/
+
+
+/* Guía para los colores: https://htmlcolorcodes.com/es/nombres-de-los-colores/  */
+
+ 
+ /* para las quotes o citas */
+
+blockquote {
+    padding: 10px 20px;
+    margin: 0 0 20px;
+    font-size: 14px;
+    border-left: 5px solid #DC143C;
+}
+
+
+/* para hacer lineas de colores */
+.linea-black {
+  border-top: 1px solid black;
+}
+
