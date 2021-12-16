@@ -1,0 +1,439 @@
+---
+title: "Emisiones agrícolas en Europa"
+subtitle: "Damián Pérez, Fátima Makroud y Galina López."
+author: "Universitat de València."
+date: "Diciembre de 2021"
+output: 
+  ioslides_presentation:
+        #-css: "assets/css_index.css"
+        logo: "./imagenes/logo.png"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r packages-setup, include = FALSE}
+library(tidyverse)
+library(klippy) #-remotes::install_github("rlesur/klippy")
+library(rio)
+library(gganimate)
+library(sf)
+library(rnaturalearth)
+library(gt) #install.packages("gt")
+library(wordcloud2) #install.packages("wordcloud2")
+library(ggThemeAssist)
+library(treemap)
+library(treemapify) #install.packages(“treemapify”)
+library(plotly)
+library(knitr)
+library(kableExtra)
+```
+
+```{r, eval = TRUE}
+agricultura_emisiones <- rio::import(here::here("datos", "emisiones_agricultura.xlsx"))
+total_emisiones <- rio::import(here::here("datos", "emisiones_totales.xlsx"))
+combustible_emisiones <- rio::import(here::here("datos", "combustibles_agricultura.xlsx"))
+
+```
+
+
+```{r, eval = TRUE}
+#Pasamos los datos a formato largo y renombramos la variable “GEO/TIME” por la variable “País”
+
+df_agri <- agricultura_emisiones %>% pivot_longer(cols = 2:31, names_to = "year", values_to = "emisiones_agri") %>% rename (pais = "GEO/TIME") 
+df_emi <- total_emisiones %>% pivot_longer(cols = 2:31, names_to = "year", values_to = "emisiones_totales") %>% rename (pais = "GEO/TIME")
+df_comb <- combustible_emisiones %>% pivot_longer(cols = 2:31, names_to = "year", values_to = "emisiones_comb") %>% rename (pais = "GEO/TIME")
+
+#Cambios los nombres de algunos países que nos dificultan el análisis
+
+df_emi$pais <- recode(df_emi$pais, 
+                          "Germany (until 1990 former territory of the FRG)" = "Germany",
+                          "United Kingdom" = "UK")
+df_agri$pais <- recode(df_agri$pais, 
+                          "Germany (until 1990 former territory of the FRG)" = "Germany",
+                          "United Kingdom" = "UK")
+df_comb$pais <- recode(df_comb$pais, 
+                          "Germany (until 1990 former territory of the FRG)" = "Germany",
+                          "United Kingdom" = "UK")
+
+#Ponemos la variable “year” como numérica
+
+df_agri <- transform(df_agri, year = as.numeric(year))
+df_emi <-  transform(df_emi, year = as.numeric(year))
+df_comb <- transform(df_comb, year = as.numeric(year))
+
+#Eliminamos los data frames que están en formato ancho
+
+rm(agricultura_emisiones, combustible_emisiones, total_emisiones)
+
+```
+
+# Índice
+
+> - Emisiones totales de efecto invernadero
+> - Análisis de las emisiones agrícolas
+> - Profundizando el análisis en España
+> - Emisiones agrícolas vs emisiones totales
+> - Impacto del combustible 
+
+
+# 1. Emisiones totales de gases efecto invernadero
+
+---
+
+```{r, echo = FALSE, eval = TRUE}
+df_totales <- df_emi%>%
+  group_by(year) %>%
+  summarise(emisiones_totales = sum(emisiones_totales))
+
+dd <- ggplot(df_totales, aes(y = emisiones_totales,
+                                 x = year)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = seq(1990, 2020, 10), limits = c(1990, 2020)) + 
+  theme(panel.background = element_rect(fill = "gray100"),
+        plot.background = element_rect(fill = "antiquewhite")) +
+  labs(title = "Emisiones totales por año",
+       subtitle = "en millones de toneladas de CO2",
+    x = "Años", y = "Emisiones ",
+    caption = "Fuente: Eurostat")
+#- anim_save("./imagenes/emi_totales.gif", dd)
+
+plotly::ggplotly(dd)
+
+```
+
+---
+
+### Otra forma de visualizar los datos {.smaller}
+
+```{r, fig.height = 3, fig.width = 5 ,dpi = 150, fig.align = "center", eval = TRUE, echo= FALSE}
+df_emi_nombres <- df_emi %>% 
+  group_by(pais) %>% 
+  summarise(emisiones_totales = sum(emisiones_totales)) %>% 
+  ungroup() %>% 
+  arrange(desc(emisiones_totales))
+  
+  wordcloud2(data = df_emi_nombres, size = 0.5)
+```
+
+# 2. Analísis de las emisiones agrícolas
+
+---
+
+```{r, echo = FALSE, eval = TRUE}
+world <- ne_countries(scale = "medium", returnclass = "sf")
+world <- world %>% filter(subregion != "Antarctica") %>% filter(admin != "Greenland")
+world <- world %>% select(name, iso_a3, geometry)
+
+
+#Hacemos coincidir los nombres con el df de world
+df_agri$pais <- recode(df_agri$pais, "Czechia" = "Czech Rep.",
+                       "UK" = "United Kingdom")
+#Unimos con world
+df_join <- left_join (df_agri, world, by = c("pais" = "name"))
+
+df_eu <- df_join %>%
+  filter(year %in% c("1990", "2000", "2010", "2019")) %>%
+  mutate(emisiones_4 = ntile(emisiones_agri, 4))
+
+p_eu <- ggplot(df_eu, aes(fill = emisiones_4, geometry = geometry)) +
+  geom_sf() +
+  labs(title = "Emisiones agrícolas por pais",
+       fill = "Emisiones") + 
+  coord_sf(xlim = c(-15.00, 42.00), ylim = c(35.60, 71,10), expand = TRUE) +
+  scale_fill_gradient("Emisiones", high = "green", low = "white") + 
+  facet_grid(year ~ .)
+
+p_eu 
+
+```
+
+---
+
+```{r,  message = FALSE,  warning = FALSE,  results = TRUE, echo = FALSE, eval = TRUE}
+df_agri2 <- df_agri %>%
+  filter(year %in% c("1990", "2000", "2010", "2019")) %>%
+  mutate(emisiones_agri = emisiones_agri/1000)
+
+g1 <- ggplot(df_agri2,  aes(x = pais, y = emisiones_agri)) + 
+        geom_col(fill = "steelblue") +
+  geom_col(data = filter(df_agri2, pais == "Spain"), fill = "orange") + 
+  coord_flip() +
+  facet_grid(cols = vars(year)) + 
+  theme(panel.background = element_rect(fill = "gray100")) +
+  labs(title = "Emisiones agrícolas, por paises",
+       x = "País", y = "Emisiones", subtitle = "en miles de toneladas de co2")
+
+g1
+
+```
+
+---
+
+```{r, eval= TRUE, echo= FALSE}
+#Sumamos la totalidad de las emisiones agrícolas por país entre los años 1990 y 2019
+
+df_agri_nombres <- df_agri %>% 
+  group_by(pais) %>% 
+  summarise(emisiones_agri = sum(emisiones_agri)) %>%
+  mutate(emisiones_agri = emisiones_agri/1000000) %>%
+  ungroup() %>% 
+  arrange(desc(emisiones_agri))
+
+ggplot(df_agri_nombres, aes(area = emisiones_agri, fill = emisiones_agri, label = pais )) +
+  geom_treemap() +
+  geom_treemap_text(colour = "white", place = "centre",
+                    grow = FALSE) +
+  scale_fill_viridis_c(option = "D" , name = "", alpha = 0.8, begin = 0.3, end = 0.7, direction = 1,
+                       guide = guide_colorbar( title = "Cantidad de emisiones, en millones de toneladas",
+                                               direction = "horizontal", barheight = unit(2,
+                                                                                          units = "mm"),
+                                               barwidth = unit(50, units = "mm"), draw.ulim = F,
+                                               title.position = 'top', title.hjust = 0.5, label.hjust = 0.5)) +
+  theme(legend.position = "bottom") +
+  scale_x_continuous(labels=function(value){format(value, scientific = FALSE)}) +
+  labs(title = "Emisiones agrícolas por país",
+       subtitle = "entre 1990 y 2019") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+---
+
+```{r, message = FALSE, warning = FALSE, eval = TRUE, fig.align = 'center'}
+knitr::include_graphics(here::here("imagenes", "anim.gif")) 
+
+```
+
+---
+
+```{r, message = FALSE, warning = FALSE, eval = TRUE}
+knitr::include_graphics(here::here("imagenes", "gg.gif")) 
+
+```
+
+# 3. Profundizando el análisis en España
+
+---
+
+```{r, message = FALSE, warning = FALSE, results = TRUE,echo = FALSE , eval = TRUE, fig.height = 3, fig.align = 'center'}
+df_esp <- df_agri %>%
+  filter (pais == "Spain")
+
+g3 <- ggplot(df_esp,  aes(x = year, y = emisiones_agri)) + 
+        geom_col(fill = "lightgreen") +
+  scale_x_continuous(breaks = seq(1990, 2020, 10), limits = c(1990, 2020)) + 
+  theme(panel.background = element_rect(fill = "thistle1")) +
+  labs(title = "Emisiones agrícolas en España",
+    x = "Años", y = "Emisiones agrícolas",
+    subtitle = "en miles de toneladas de CO2")
+
+g3 + labs (caption = "Fuente: Eurostat")
+
+```
+
+---
+
+```{r, echo = FALSE, eval = TRUE, fig.height = 3, fig.align = 'center'}
+impact_max_esp <-  df_agri %>%
+  filter(pais == "Spain") %>%
+  slice_max(emisiones_agri, n = 5) %>%
+  rename("País" = pais, "Años" = year, "Emisiones agrícolas" = emisiones_agri)
+
+gt_esp1 <- gt(impact_max_esp) %>% 
+  tab_header(title = md("**Los 5 años que más emisiones ha lanzado España**"),
+             subtitle = "entre 1990 y 2019") %>%
+  tab_source_note(md("Fuente: [EUROSTAT](https://appsso.eurostat.ec.europa.eu/nui/show.do?dataset=env_air_gge&lang=en)")) 
+
+gt_esp1
+
+```
+
+---
+
+```{r, echo = FALSE, eval = TRUE, fig.align = 'center'}
+impact_min_esp <-  df_agri %>% 
+  filter(pais == "Spain") %>%
+  slice_min(emisiones_agri, n = 5) %>%
+  rename("País" = pais, "Años" = year, "Emisiones agrícolas" = emisiones_agri)
+
+gt_esp2 <- gt(impact_min_esp) %>% 
+  tab_header(title = md("**Los 5 años que menos emisiones ha lanzado España**"),
+             subtitle = "entre 1990 y 2019") %>%
+  tab_source_note(md("Fuente: [EUROSTAT](https://appsso.eurostat.ec.europa.eu/nui/show.do?dataset=env_air_gge&lang=en)"))
+
+gt_esp2
+
+```
+
+# 4. Emisiones agrícolas vs Emisiones totales
+
+---
+
+```{r, message = FALSE, warning = FALSE, results = TRUE,echo = FALSE , eval = TRUE, fig.align = 'center'}
+data <- data.frame(
+  group = LETTERS[1:2],
+  value = c(506550.8, 4327981))
+
+data <- data %>% 
+  arrange(desc(group)) %>%
+  mutate(prop = value / sum(data$value) * 100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+
+p <- ggplot(data, aes(x="", y = prop, fill = group)) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar("y", start = 0) +
+  theme_void() + 
+  theme(legend.position = "none") +
+  geom_text(aes(y = ypos, label = group), color = "black", size = 6) +
+  scale_fill_brewer(palette="Set5")
+
+p + labs(title = "Emisiones agrícolas sobre las emisiones totales",
+     subtitle = "para el año 2019",
+     caption = "Fuente: Eurostat")
+
+```
+
+---
+
+```{r, message = FALSE, warning = FALSE, results = TRUE,echo = FALSE , eval = TRUE}
+#Juntamos los dos df para poder trabajar mejor en nuestros análisis 
+
+df_left_join <- left_join(df_agri, df_totales)
+
+##Porcentaje de emisiones agrícolas sobre el total de emisiones para cada país
+
+#Para cada año
+
+df_comparacion_1 <- df_left_join %>%
+  group_by(pais) %>%
+  mutate(porcent_sobre_total = emisiones_agri/emisiones_totales * 100) %>%
+  mutate(var_porcent = porcent_sobre_total - lag(porcent_sobre_total)) 
+
+#Entre 1990 y 2019
+
+df_comparacion_2 <- df_left_join %>%
+  filter(year %in% c(1990,2019)) %>%
+  group_by(pais) %>%
+  mutate(porcent_sobre_total = emisiones_agri/emisiones_totales * 100) %>%
+  mutate(var_porcent = porcent_sobre_total - first(porcent_sobre_total)) 
+
+#Elegimos los 5 países con mayor porcentaje de emisiones agrícolas sobre el total para hacer la tabla
+
+df_max_comp <- df_comparacion_2 %>%
+  filter(year == 2019) %>%
+  ungroup() %>%
+  slice_max(porcent_sobre_total, n = 5) %>%
+  rename("Paises" = pais, "Años" = year, "Emisiones agrícolas" = emisiones_agri, "Emisiones 
+         totales" = emisiones_totales, "% sobre el total" = porcent_sobre_total, "Variación 
+         porcentual" = var_porcent)
+
+gt_max <- gt(df_max_comp) %>% 
+  tab_header(title = md("**Los 5 paises con mayor porcentaje de emisiones agrícolas sobre el total**"),
+             subtitle = "entre 1990 y 2019") %>%
+  tab_source_note(md("Fuente: [EUROSTAT](https://appsso.eurostat.ec.europa.eu/nui/show.do?dataset=env_air_gge&lang=en)")) 
+
+gt_max
+```
+
+
+```{r, message = FALSE, warning = FALSE, results = TRUE,echo = FALSE , eval = TRUE}
+#Juntamos los dos df para poder trabajar mejor en nuestros análisis 
+
+df_left_join <- left_join(df_agri, df_totales)
+
+##Porcentaje de emisiones agrícolas sobre el total de emisiones para cada país
+
+#Para cada año
+
+df_comparacion_1 <- df_left_join %>%
+  group_by(pais) %>%
+  mutate(porcent_sobre_total = emisiones_agri/emisiones_totales * 100) %>%
+  mutate(var_porcent = porcent_sobre_total - lag(porcent_sobre_total)) 
+
+#Entre 1990 y 2019
+
+df_comparacion_2 <- df_left_join %>%
+  filter(year %in% c(1990,2019)) %>%
+  group_by(pais) %>%
+  mutate(porcent_sobre_total = emisiones_agri/emisiones_totales * 100) %>%
+  mutate(var_porcent = porcent_sobre_total - first(porcent_sobre_total)) 
+
+df_min_comp <- df_comparacion_2 %>%
+  filter(year == 2019) %>%
+  ungroup() %>%
+  slice_min(porcent_sobre_total, n = 5) %>%
+  rename("Paises" = pais, "Años" = year, "Emisiones agrícolas" = emisiones_agri, "Emisiones totales" = emisiones_totales, "% sobre el total" = porcent_sobre_total, "Variación porcentual" = var_porcent)
+
+gt_min <- gt(df_min_comp) %>% 
+  tab_header(title = md("**Los 5 paises con menor porcentaje de emisiones agrícolas sobre el total**"),
+             subtitle = "entre 1990 y 2019") %>%
+  tab_source_note(md("Fuente: [EUROSTAT](https://appsso.eurostat.ec.europa.eu/nui/show.do?dataset=env_air_gge&lang=en)")) 
+
+gt_min
+
+```
+
+
+# 5. Impacto del combustible en la agricultura
+
+---
+
+```{r, message = FALSE, warning = FALSE, results = TRUE,echo = FALSE , eval = TRUE, fig.align = 'center'}
+data_comb <- data.frame(
+  group = LETTERS[1:2],
+  value = c(Emisiones_combustible = 94680.73, Emisiones_agrícolas = 506550.8))
+
+data_comb <- data_comb %>% 
+  arrange(desc(group)) %>%
+  mutate(prop = value / sum(data_comb$value) * 100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+p1 <- ggplot(data_comb, aes(x ="", y = prop, fill = group)) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar("y", start=0) +
+  theme_void() + 
+  theme(legend.position="none") +
+  geom_text(aes(y = ypos, label = group), color = "black", size=6) +
+  scale_fill_brewer(palette = "Set6")
+
+p1 + labs(title = "Emisiones del combustible sobre las emisiones agrícolas",
+     subtitle = "para el año 2019",
+     caption = "Fuente: Eurostat" )
+
+```
+
+---
+
+```{r, warning = FALSE, messages = FALSE, echo = FALSE, eval = TRUE, fig.align = 'center'}
+
+impact_comb <- df_comb %>%
+  filter(year %in% c(1990, 2019)) %>%
+  group_by(year) %>% 
+  select(pais, year, emisiones_comb) %>% 
+  slice_max(emisiones_comb, n = 5) %>%
+  rename("Paises" = pais, "Años" = year, "Emisiones de combustible" = emisiones_comb)
+
+gt_comb <- gt(impact_comb) %>% 
+  tab_header(title = md("**Los 5 paises con mayor impacto del combustible sobre la agricultura**"),
+             subtitle = "entre 1990 y 2019") %>%
+  tab_source_note(md("Fuente: [EUROSTAT](https://appsso.eurostat.ec.europa.eu/nui/show.do?dataset=env_air_gge&lang=en)")) 
+
+gt_comb
+
+```
+
+## BON NADAL, MIAU !!!
+
+```{r, message = FALSE, warning = FALSE, eval = TRUE, fig.align = 'center'}
+knitr::include_graphics(here::here("imagenes", "gato-feliz-navidad.gif")) 
+
+```
+
+
+
+
